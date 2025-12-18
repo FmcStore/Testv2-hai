@@ -1,0 +1,5 @@
+{
+  "name": "Copy of Fmc AI Chat Pro",
+  "description": "Advanced AI Chat interface featuring multiple models: Fmc AI (Perplexity), Quill AI (Scrape with History), and Gemini 3 Pro. Includes web search capabilities and persistent chat sessions.",
+  "requestFramePermissions": []
+}
