@@ -2,13 +2,24 @@
 import { GoogleGenAI } from "@google/genai";
 import { AIModel, AskParams, AskResponse } from "../types";
 
+// Helper untuk mengambil API Key dengan aman di lingkungan browser
+const getApiKey = () => {
+  try {
+    return process.env.API_KEY || "";
+  } catch (e) {
+    console.warn("API_KEY tidak ditemukan di process.env");
+    return "";
+  }
+};
+
 const FGSI_API_KEY = "fgsiapi-27a08a79-6d";
 
 export const callFmcPerplexity = async (text: string): Promise<string> => {
   const apiUrl = `https://fgsi.dpdns.org/api/ai/perplexity?apikey=${FGSI_API_KEY}&text=${encodeURIComponent(text)}`;
   const response = await fetch(apiUrl);
+  if (!response.ok) throw new Error("Gagal menghubungi Fmc AI");
+  
   const data = await response.json();
-
   if (data.status && data.data && Array.isArray(data.data.text)) {
     const finalStep = data.data.text.find((step: any) => step.step_type === 'FINAL');
     if (finalStep && finalStep.content && finalStep.content.answer) {
@@ -20,12 +31,9 @@ export const callFmcPerplexity = async (text: string): Promise<string> => {
       }
     }
   }
-  throw new Error("Failed to get response from Fmc AI");
+  return "Maaf, Fmc AI tidak memberikan respon yang valid.";
 };
 
-/**
- * Ported Quillbot Scrape Logic for Browser environment
- */
 export const callQuillChat = async ({ prompt, chatId = null, webSearch = false }: AskParams): Promise<AskResponse> => {
   const payload = {
     stream: true,
@@ -59,7 +67,7 @@ export const callQuillChat = async ({ prompt, chatId = null, webSearch = false }
   if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
   const reader = response.body?.getReader();
-  if (!reader) throw new Error("No response body reader");
+  if (!reader) throw new Error("Gagal membaca stream dari Quillbot");
 
   let finalText = "";
   let finalChatId = chatId || undefined;
@@ -87,7 +95,7 @@ export const callQuillChat = async ({ prompt, chatId = null, webSearch = false }
         if (json.chunk) finalText += json.chunk;
         if (json.text) finalText = json.text;
       } catch (e) {
-        // Silently skip parse errors
+        // Skip parse errors
       }
     }
   }
@@ -95,15 +103,23 @@ export const callQuillChat = async ({ prompt, chatId = null, webSearch = false }
   return {
     success: true,
     chatId: finalChatId,
-    response: finalText.trim()
+    response: finalText.trim() || "Respon kosong dari Quillbot."
   };
 };
 
 export const callGemini = async (prompt: string): Promise<string> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  const response = await ai.models.generateContent({
-    model: 'gemini-3-flash-preview',
-    contents: prompt,
-  });
-  return response.text || "No response from Gemini.";
+  const apiKey = getApiKey();
+  if (!apiKey) return "API Key Gemini belum dikonfigurasi.";
+
+  const ai = new GoogleGenAI({ apiKey });
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: prompt,
+    });
+    return response.text || "Tidak ada respon dari Gemini.";
+  } catch (error) {
+    console.error("Gemini Error:", error);
+    return "Terjadi kesalahan pada layanan Gemini.";
+  }
 };
